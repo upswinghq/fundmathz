@@ -21,10 +21,10 @@ import {
 type Opportunity = {
   id: string;
   name: string;
-  type: string;
+  type: OpportunityType;
   link: string;
   deadline: string;
-  stage: string;
+  stage: OpportunityStage;
   sector: string;
   location: string;
   notes: string;
@@ -33,12 +33,55 @@ type Opportunity = {
 
 type OpportunityFormState = Omit<Opportunity, "id" | "created_by">;
 
+type OpportunityStage = "idea" | "mvp" | "early_revenue" | "growth";
+type OpportunityType =
+  | "grant"
+  | "accelerator"
+  | "incubator"
+  | "fellowship"
+  | "competition/hackathon";
+
+const stageOptions: Array<{ label: string; value: OpportunityStage }> = [
+  { label: "Idea", value: "idea" },
+  { label: "MVP", value: "mvp" },
+  { label: "Early Revenue", value: "early_revenue" },
+  { label: "Growth", value: "growth" }
+];
+
+const typeOptions: Array<{ label: string; value: OpportunityType }> = [
+  { label: "Grant", value: "grant" },
+  { label: "Accelerator", value: "accelerator" },
+  { label: "Incubator", value: "incubator" },
+  { label: "Fellowship", value: "fellowship" },
+  { label: "Competition/Hackathon", value: "competition/hackathon" }
+];
+
+function normalizeStage(value: string): OpportunityStage {
+  return stageOptions.some((option) => option.value === value)
+    ? (value as OpportunityStage)
+    : "idea";
+}
+
+function normalizeType(value: string): OpportunityType {
+  return typeOptions.some((option) => option.value === value)
+    ? (value as OpportunityType)
+    : "grant";
+}
+
+function getStageLabel(value: string) {
+  return stageOptions.find((option) => option.value === normalizeStage(value))?.label ?? "Idea";
+}
+
+function getTypeLabel(value: string) {
+  return typeOptions.find((option) => option.value === normalizeType(value))?.label ?? "Grant";
+}
+
 const initialForm: OpportunityFormState = {
   name: "",
-  type: "",
+  type: "grant",
   link: "",
   deadline: "",
-  stage: "",
+  stage: "idea",
   sector: "",
   location: "",
   notes: ""
@@ -80,7 +123,9 @@ export function OpportunitiesManager() {
 
           return {
             id: doc.id,
-            ...data
+            ...data,
+            stage: normalizeStage(data.stage),
+            type: normalizeType(data.type)
           };
         });
 
@@ -115,6 +160,8 @@ export function OpportunitiesManager() {
     try {
       await addDoc(collection(db, "opportunities"), {
         ...form,
+        stage: normalizeStage(form.stage),
+        type: normalizeType(form.type),
         created_by: user.uid
       });
 
@@ -140,10 +187,10 @@ export function OpportunitiesManager() {
     setEditingId(opportunity.id);
     setEditingForm({
       name: opportunity.name,
-      type: opportunity.type,
+      type: normalizeType(opportunity.type),
       link: opportunity.link,
       deadline: opportunity.deadline,
-      stage: opportunity.stage,
+      stage: normalizeStage(opportunity.stage),
       sector: opportunity.sector,
       location: opportunity.location,
       notes: opportunity.notes
@@ -169,7 +216,11 @@ export function OpportunitiesManager() {
     setMessage("");
 
     try {
-      await updateDoc(doc(db, "opportunities", editingId), editingForm);
+      await updateDoc(doc(db, "opportunities", editingId), {
+        ...editingForm,
+        stage: normalizeStage(editingForm.stage),
+        type: normalizeType(editingForm.type)
+      });
       setEditingId(null);
       setEditingForm(initialForm);
       setMessage("Opportunity updated.");
@@ -229,12 +280,18 @@ export function OpportunitiesManager() {
 
           <label className="field">
             <span>Type</span>
-            <input
-              type="text"
+            <select
               value={form.type}
-              onChange={(event) => handleChange("type", event.target.value)}
-              required
-            />
+              onChange={(event) =>
+                handleChange("type", normalizeType(event.target.value))
+              }
+            >
+              {typeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="field">
@@ -259,12 +316,18 @@ export function OpportunitiesManager() {
 
           <label className="field">
             <span>Stage</span>
-            <input
-              type="text"
+            <select
               value={form.stage}
-              onChange={(event) => handleChange("stage", event.target.value)}
-              required
-            />
+              onChange={(event) =>
+                handleChange("stage", normalizeStage(event.target.value))
+              }
+            >
+              {stageOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="field">
@@ -329,17 +392,21 @@ export function OpportunitiesManager() {
 
             <label className="field">
               <span>Type</span>
-              <input
-                type="text"
+              <select
                 value={editingForm.type}
                 onChange={(event) =>
                   setEditingForm((current) => ({
                     ...current,
-                    type: event.target.value
+                    type: normalizeType(event.target.value)
                   }))
                 }
-                required
-              />
+              >
+                {typeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="field">
@@ -374,17 +441,21 @@ export function OpportunitiesManager() {
 
             <label className="field">
               <span>Stage</span>
-              <input
-                type="text"
+              <select
                 value={editingForm.stage}
                 onChange={(event) =>
                   setEditingForm((current) => ({
                     ...current,
-                    stage: event.target.value
+                    stage: normalizeStage(event.target.value)
                   }))
                 }
-                required
-              />
+              >
+                {stageOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="field">
@@ -481,14 +552,14 @@ export function OpportunitiesManager() {
                 opportunities.map((opportunity) => (
                   <tr key={opportunity.id}>
                     <td>{opportunity.name}</td>
-                    <td>{opportunity.type}</td>
+                    <td>{getTypeLabel(opportunity.type)}</td>
                     <td>
                       <a href={opportunity.link} target="_blank" rel="noreferrer">
                         {opportunity.link}
                       </a>
                     </td>
                     <td>{opportunity.deadline}</td>
-                    <td>{opportunity.stage}</td>
+                    <td>{getStageLabel(opportunity.stage)}</td>
                     <td>{opportunity.sector}</td>
                     <td>{opportunity.location}</td>
                     <td>{opportunity.notes}</td>
