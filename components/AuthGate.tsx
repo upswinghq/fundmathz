@@ -5,11 +5,11 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 
-type ProtectedContentProps = {
+type AuthGateProps = {
   children: ReactNode;
 };
 
-export function ProtectedContent({ children }: ProtectedContentProps) {
+export function AuthGate({ children }: AuthGateProps) {
   const router = useRouter();
   const { configError, isLoading, user } = useAuth();
 

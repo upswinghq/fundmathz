@@ -52,12 +52,12 @@ export function AuthForm({ mode }: AuthFormProps) {
     try {
       if (mode === "signup") {
         await createUserWithEmailAndPassword(auth, email, password);
-        router.replace("/");
+        router.replace("/dashboard");
         return;
       }
 
       await signInWithEmailAndPassword(auth, email, password);
-      router.replace("/");
+      router.replace("/dashboard");
     } catch (error) {
       const nextMessage =
         error instanceof Error ? error.message : "Something went wrong.";

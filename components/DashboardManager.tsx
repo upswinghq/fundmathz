@@ -22,9 +22,48 @@ type Application = {
   notes: string;
 };
 
+type Opportunity = {
+  id: string;
+  name: string;
+};
+
 export function DashboardManager() {
   const { configError, user } = useAuth();
   const [applications, setApplications] = useState<Application[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+
+  useEffect(() => {
+    if (!user) {
+      setOpportunities([]);
+      return;
+    }
+
+    const db = getFirestoreDb();
+
+    if (!db) {
+      return;
+    }
+
+    const opportunitiesQuery = query(
+      collection(db, "opportunities"),
+      where("created_by", "==", user.uid)
+    );
+
+    const unsubscribe = onSnapshot(opportunitiesQuery, (snapshot) => {
+      const nextOpportunities = snapshot.docs.map((item) => {
+        const data = item.data() as Omit<Opportunity, "id">;
+
+        return {
+          id: item.id,
+          name: data.name
+        };
+      });
+
+      setOpportunities(nextOpportunities);
+    });
+
+    return unsubscribe;
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -66,13 +105,22 @@ export function DashboardManager() {
     const sevenDaysFromNow = new Date(today);
     sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
+    const opportunityNames = new Map(
+      opportunities.map((opportunity) => [opportunity.id, opportunity.name])
+    );
+
     const upcomingDeadlines = applications
       .filter((application) => {
         const deadline = new Date(`${application.deadline}T00:00:00`);
 
         return deadline >= today && deadline <= sevenDaysFromNow;
       })
-      .sort((left, right) => left.deadline.localeCompare(right.deadline));
+      .sort((left, right) => left.deadline.localeCompare(right.deadline))
+      .map((application) => ({
+        ...application,
+        opportunityName:
+          opportunityNames.get(application.opportunity_id) ?? application.opportunity_id
+      }));
 
     return {
       upcomingDeadlines,
@@ -84,14 +132,14 @@ export function DashboardManager() {
         accepted: applications.filter((application) => application.status === "accepted").length
       }
     };
-  }, [applications]);
+  }, [applications, opportunities]);
 
   return (
-    <div className="opportunities-layout">
+    <div className="content-stack">
       <section className="card card-wide">
         <div className="stack">
-          <h1>Dashboard</h1>
-          <p>Application summary.</p>
+          <h1>Welcome back</h1>
+          <p>Here is a quick look at your applications.</p>
         </div>
 
         <div className="dashboard-grid">
@@ -120,7 +168,7 @@ export function DashboardManager() {
           <table className="table">
             <thead>
               <tr>
-                <th>Opportunity ID</th>
+                <th>Opportunity</th>
                 <th>Deadline</th>
                 <th>Status</th>
                 <th>Next Action</th>
@@ -136,7 +184,7 @@ export function DashboardManager() {
               ) : (
                 summary.upcomingDeadlines.map((application) => (
                   <tr key={application.id}>
-                    <td>{application.opportunity_id}</td>
+                    <td>{application.opportunityName}</td>
                     <td>{application.deadline}</td>
                     <td>{application.status}</td>
                     <td>{application.next_action}</td>

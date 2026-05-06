@@ -1,26 +1,16 @@
-import Link from "next/link";
-import { ProtectedContent } from "@/components/ProtectedContent";
+import { PublicOnly } from "@/components/PublicOnly";
 
 export default function HomePage() {
   return (
-    <ProtectedContent>
+    <PublicOnly>
       <main className="page">
         <section className="card">
           <div className="stack">
-            <h1>Welcome</h1>
-            <p>You are signed in.</p>
-            <p>
-              <Link href="/opportunities">Go to opportunities</Link>
-            </p>
-            <p>
-              <Link href="/applications">Go to applications</Link>
-            </p>
-            <p>
-              <Link href="/dashboard">Go to dashboard</Link>
-            </p>
+            <h1>FundMaths</h1>
+            <p>Please log in to continue.</p>
           </div>
         </section>
       </main>
-    </ProtectedContent>
+    </PublicOnly>
   );
 }

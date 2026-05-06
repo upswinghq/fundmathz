@@ -4,8 +4,11 @@ import { FormEvent, useEffect, useState } from "react";
 import {
   addDoc,
   collection,
+  deleteDoc,
+  doc,
   onSnapshot,
   query,
+  updateDoc,
   where
 } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
@@ -44,8 +47,11 @@ const initialForm: OpportunityFormState = {
 export function OpportunitiesManager() {
   const { configError, user } = useAuth();
   const [form, setForm] = useState<OpportunityFormState>(initialForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingForm, setEditingForm] = useState<OpportunityFormState>(initialForm);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -130,8 +136,80 @@ export function OpportunitiesManager() {
     }));
   }
 
+  function startEdit(opportunity: Opportunity) {
+    setEditingId(opportunity.id);
+    setEditingForm({
+      name: opportunity.name,
+      type: opportunity.type,
+      link: opportunity.link,
+      deadline: opportunity.deadline,
+      stage: opportunity.stage,
+      sector: opportunity.sector,
+      location: opportunity.location,
+      notes: opportunity.notes
+    });
+    setMessage("");
+  }
+
+  async function handleUpdate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!editingId) {
+      return;
+    }
+
+    const db = getFirestoreDb();
+
+    if (!db) {
+      setMessage(getFirebaseConfigError() ?? "Firestore is unavailable.");
+      return;
+    }
+
+    setIsSavingEdit(true);
+    setMessage("");
+
+    try {
+      await updateDoc(doc(db, "opportunities", editingId), editingForm);
+      setEditingId(null);
+      setEditingForm(initialForm);
+      setMessage("Opportunity updated.");
+    } catch (error) {
+      setMessage(formatFirebaseError(error, "Could not update opportunity."));
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
+  async function handleDelete(opportunityId: string) {
+    if (!window.confirm("Delete this opportunity?")) {
+      return;
+    }
+
+    const db = getFirestoreDb();
+
+    if (!db) {
+      setMessage(getFirebaseConfigError() ?? "Firestore is unavailable.");
+      return;
+    }
+
+    setMessage("");
+
+    try {
+      await deleteDoc(doc(db, "opportunities", opportunityId));
+
+      if (editingId === opportunityId) {
+        setEditingId(null);
+        setEditingForm(initialForm);
+      }
+
+      setMessage("Opportunity deleted.");
+    } catch (error) {
+      setMessage(formatFirebaseError(error, "Could not delete opportunity."));
+    }
+  }
+
   return (
-    <div className="opportunities-layout">
+    <div className="content-stack">
       <section className="card card-wide">
         <div className="stack">
           <h1>Opportunities</h1>
@@ -226,6 +304,152 @@ export function OpportunitiesManager() {
         </form>
       </section>
 
+      {editingId ? (
+        <section className="card card-wide">
+          <div className="stack">
+            <h2>Edit Opportunity</h2>
+            <p>Update the selected opportunity.</p>
+          </div>
+
+          <form className="form" onSubmit={handleUpdate}>
+            <label className="field">
+              <span>Name</span>
+              <input
+                type="text"
+                value={editingForm.name}
+                onChange={(event) =>
+                  setEditingForm((current) => ({
+                    ...current,
+                    name: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Type</span>
+              <input
+                type="text"
+                value={editingForm.type}
+                onChange={(event) =>
+                  setEditingForm((current) => ({
+                    ...current,
+                    type: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Link</span>
+              <input
+                type="url"
+                value={editingForm.link}
+                onChange={(event) =>
+                  setEditingForm((current) => ({
+                    ...current,
+                    link: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Deadline</span>
+              <input
+                type="date"
+                value={editingForm.deadline}
+                onChange={(event) =>
+                  setEditingForm((current) => ({
+                    ...current,
+                    deadline: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Stage</span>
+              <input
+                type="text"
+                value={editingForm.stage}
+                onChange={(event) =>
+                  setEditingForm((current) => ({
+                    ...current,
+                    stage: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Sector</span>
+              <input
+                type="text"
+                value={editingForm.sector}
+                onChange={(event) =>
+                  setEditingForm((current) => ({
+                    ...current,
+                    sector: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Location</span>
+              <input
+                type="text"
+                value={editingForm.location}
+                onChange={(event) =>
+                  setEditingForm((current) => ({
+                    ...current,
+                    location: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Notes</span>
+              <textarea
+                value={editingForm.notes}
+                onChange={(event) =>
+                  setEditingForm((current) => ({
+                    ...current,
+                    notes: event.target.value
+                  }))
+                }
+                rows={4}
+              />
+            </label>
+
+            <div className="inline-actions">
+              <button type="submit" disabled={isSavingEdit}>
+                {isSavingEdit ? "Saving..." : "Save changes"}
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => {
+                  setEditingId(null);
+                  setEditingForm(initialForm);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
+
       <section className="card card-wide">
         <div className="stack">
           <h2>Opportunity List</h2>
@@ -243,7 +467,7 @@ export function OpportunitiesManager() {
                 <th>Sector</th>
                 <th>Location</th>
                 <th>Notes</th>
-                <th>Created By</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -268,7 +492,24 @@ export function OpportunitiesManager() {
                     <td>{opportunity.sector}</td>
                     <td>{opportunity.location}</td>
                     <td>{opportunity.notes}</td>
-                    <td>{opportunity.created_by}</td>
+                    <td>
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={() => startEdit(opportunity)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="danger-button"
+                          onClick={() => void handleDelete(opportunity.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}

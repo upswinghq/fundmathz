@@ -15,7 +15,7 @@ export function PublicOnly({ children }: PublicOnlyProps) {
 
   useEffect(() => {
     if (!configError && !isLoading && user) {
-      router.replace("/");
+      router.replace("/dashboard");
     }
   }, [configError, isLoading, router, user]);
 

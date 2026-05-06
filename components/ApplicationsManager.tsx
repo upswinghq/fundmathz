@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   onSnapshot,
   query,
@@ -11,7 +12,11 @@ import {
   where
 } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
-import { getFirebaseConfigError, getFirestoreDb } from "@/lib/firebase";
+import {
+  formatFirebaseError,
+  getFirebaseConfigError,
+  getFirestoreDb
+} from "@/lib/firebase";
 
 type Opportunity = {
   id: string;
@@ -67,8 +72,18 @@ export function ApplicationsManager() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [form, setForm] = useState<ApplicationFormState>(initialForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingForm, setEditingForm] = useState<
+    Omit<ApplicationFormState, "opportunity_id">
+  >({
+    status: "not_started",
+    deadline: "",
+    next_action: "",
+    notes: ""
+  });
   const [notesDrafts, setNotesDrafts] = useState<NotesDraftState>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [savingStatus, setSavingStatus] = useState<SavingState>({});
   const [savingNotes, setSavingNotes] = useState<SavingState>({});
   const [message, setMessage] = useState("");
@@ -198,9 +213,54 @@ export function ApplicationsManager() {
       setForm(initialForm);
       setMessage("Application created.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Something went wrong.");
+      setMessage(formatFirebaseError(error, "Could not create application."));
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  function startEdit(application: Application) {
+    setEditingId(application.id);
+    setEditingForm({
+      status: application.status,
+      deadline: application.deadline,
+      next_action: application.next_action,
+      notes: application.notes
+    });
+    setMessage("");
+  }
+
+  async function handleUpdate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!editingId) {
+      return;
+    }
+
+    const db = getFirestoreDb();
+
+    if (!db) {
+      setMessage(getFirebaseConfigError() ?? "Firestore is unavailable.");
+      return;
+    }
+
+    setIsSavingEdit(true);
+    setMessage("");
+
+    try {
+      await updateDoc(doc(db, "applications", editingId), editingForm);
+      setEditingId(null);
+      setEditingForm({
+        status: "not_started",
+        deadline: "",
+        next_action: "",
+        notes: ""
+      });
+      setMessage("Application updated.");
+    } catch (error) {
+      setMessage(formatFirebaseError(error, "Could not update application."));
+    } finally {
+      setIsSavingEdit(false);
     }
   }
 
@@ -219,6 +279,9 @@ export function ApplicationsManager() {
 
     try {
       await updateDoc(doc(db, "applications", applicationId), { status });
+      setMessage("Application status updated.");
+    } catch (error) {
+      setMessage(formatFirebaseError(error, "Could not update status."));
     } finally {
       setSavingStatus((current) => ({
         ...current,
@@ -244,6 +307,9 @@ export function ApplicationsManager() {
       await updateDoc(doc(db, "applications", applicationId), {
         notes: notesDrafts[applicationId] ?? ""
       });
+      setMessage("Notes updated.");
+    } catch (error) {
+      setMessage(formatFirebaseError(error, "Could not update notes."));
     } finally {
       setSavingNotes((current) => ({
         ...current,
@@ -252,8 +318,35 @@ export function ApplicationsManager() {
     }
   }
 
+  async function handleDelete(applicationId: string) {
+    if (!window.confirm("Delete this application?")) {
+      return;
+    }
+
+    const db = getFirestoreDb();
+
+    if (!db) {
+      setMessage(getFirebaseConfigError() ?? "Firestore is unavailable.");
+      return;
+    }
+
+    setMessage("");
+
+    try {
+      await deleteDoc(doc(db, "applications", applicationId));
+
+      if (editingId === applicationId) {
+        setEditingId(null);
+      }
+
+      setMessage("Application deleted.");
+    } catch (error) {
+      setMessage(formatFirebaseError(error, "Could not delete application."));
+    }
+  }
+
   return (
-    <div className="opportunities-layout">
+    <div className="content-stack">
       <section className="card card-wide">
         <div className="stack">
           <h1>Applications</h1>
@@ -353,6 +446,101 @@ export function ApplicationsManager() {
         </form>
       </section>
 
+      {editingId ? (
+        <section className="card card-wide">
+          <div className="stack">
+            <h2>Edit Application</h2>
+            <p>Update the selected application.</p>
+          </div>
+
+          <form className="form" onSubmit={handleUpdate}>
+            <label className="field">
+              <span>Status</span>
+              <select
+                value={editingForm.status}
+                onChange={(event) =>
+                  setEditingForm((current) => ({
+                    ...current,
+                    status: event.target.value as ApplicationStatus
+                  }))
+                }
+              >
+                {statuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>Deadline</span>
+              <input
+                type="date"
+                value={editingForm.deadline}
+                onChange={(event) =>
+                  setEditingForm((current) => ({
+                    ...current,
+                    deadline: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Next Action</span>
+              <input
+                type="text"
+                value={editingForm.next_action}
+                onChange={(event) =>
+                  setEditingForm((current) => ({
+                    ...current,
+                    next_action: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Notes</span>
+              <textarea
+                value={editingForm.notes}
+                onChange={(event) =>
+                  setEditingForm((current) => ({
+                    ...current,
+                    notes: event.target.value
+                  }))
+                }
+                rows={4}
+              />
+            </label>
+
+            <div className="inline-actions">
+              <button type="submit" disabled={isSavingEdit}>
+                {isSavingEdit ? "Saving..." : "Save changes"}
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => {
+                  setEditingId(null);
+                  setEditingForm({
+                    status: "not_started",
+                    deadline: "",
+                    next_action: "",
+                    notes: ""
+                  });
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
+
       <section className="card card-wide">
         <div className="stack">
           <h2>Application List</h2>
@@ -367,12 +555,13 @@ export function ApplicationsManager() {
                 <th>Deadline</th>
                 <th>Next Action</th>
                 <th>Notes</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {applicationsWithOpportunityName.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={6}>
                     {configError ?? "No applications yet."}
                   </td>
                 </tr>
@@ -418,6 +607,24 @@ export function ApplicationsManager() {
                           disabled={savingNotes[application.id]}
                         >
                           {savingNotes[application.id] ? "Saving..." : "Save notes"}
+                        </button>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={() => startEdit(application)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="danger-button"
+                          onClick={() => void handleDelete(application.id)}
+                        >
+                          Delete
                         </button>
                       </div>
                     </td>
