@@ -67,6 +67,22 @@ const initialForm: ApplicationFormState = {
   notes: ""
 };
 
+function shouldShowNextAction(status: ApplicationStatus) {
+  return status !== "rejected";
+}
+
+function isNextActionRequired(status: ApplicationStatus) {
+  return status === "not_started" || status === "in_progress";
+}
+
+function getNextActionPlaceholder(status: ApplicationStatus) {
+  if (status === "submitted") {
+    return "Prepare pitch deck";
+  }
+
+  return status === "accepted" ? "Prepare pitch deck" : "Finish application";
+}
+
 export function ApplicationsManager() {
   const { configError, user } = useAuth();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -206,7 +222,7 @@ export function ApplicationsManager() {
         opportunity_id: form.opportunity_id,
         status: form.status,
         deadline: form.deadline,
-        next_action: form.next_action,
+        next_action: shouldShowNextAction(form.status) ? form.next_action : "",
         notes: form.notes
       });
 
@@ -248,7 +264,12 @@ export function ApplicationsManager() {
     setMessage("");
 
     try {
-      await updateDoc(doc(db, "applications", editingId), editingForm);
+      await updateDoc(doc(db, "applications", editingId), {
+        ...editingForm,
+        next_action: shouldShowNextAction(editingForm.status)
+          ? editingForm.next_action
+          : ""
+      });
       setEditingId(null);
       setEditingForm({
         status: "not_started",
@@ -382,7 +403,9 @@ export function ApplicationsManager() {
               onChange={(event) =>
                 setForm((current) => ({
                   ...current,
-                  status: event.target.value as ApplicationStatus
+                  status: event.target.value as ApplicationStatus,
+                  next_action:
+                    event.target.value === "rejected" ? "" : current.next_action
                 }))
               }
             >
@@ -409,20 +432,23 @@ export function ApplicationsManager() {
             />
           </label>
 
-          <label className="field">
-            <span>Next Action</span>
-            <input
-              type="text"
-              value={form.next_action}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  next_action: event.target.value
-                }))
-              }
-              required
-            />
-          </label>
+          {shouldShowNextAction(form.status) ? (
+            <label className="field">
+              <span>Next Action</span>
+              <input
+                type="text"
+                value={form.next_action}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    next_action: event.target.value
+                  }))
+                }
+                placeholder={getNextActionPlaceholder(form.status)}
+                required={isNextActionRequired(form.status)}
+              />
+            </label>
+          ) : null}
 
           <label className="field">
             <span>Notes</span>
@@ -461,7 +487,9 @@ export function ApplicationsManager() {
                 onChange={(event) =>
                   setEditingForm((current) => ({
                     ...current,
-                    status: event.target.value as ApplicationStatus
+                    status: event.target.value as ApplicationStatus,
+                    next_action:
+                      event.target.value === "rejected" ? "" : current.next_action
                   }))
                 }
               >
@@ -488,20 +516,23 @@ export function ApplicationsManager() {
               />
             </label>
 
-            <label className="field">
-              <span>Next Action</span>
-              <input
-                type="text"
-                value={editingForm.next_action}
-                onChange={(event) =>
-                  setEditingForm((current) => ({
-                    ...current,
-                    next_action: event.target.value
-                  }))
-                }
-                required
-              />
-            </label>
+            {shouldShowNextAction(editingForm.status) ? (
+              <label className="field">
+                <span>Next Action</span>
+                <input
+                  type="text"
+                  value={editingForm.next_action}
+                  onChange={(event) =>
+                    setEditingForm((current) => ({
+                      ...current,
+                      next_action: event.target.value
+                    }))
+                  }
+                  placeholder={getNextActionPlaceholder(editingForm.status)}
+                  required={isNextActionRequired(editingForm.status)}
+                />
+              </label>
+            ) : null}
 
             <label className="field">
               <span>Notes</span>
