@@ -11,13 +11,26 @@ type PublicOnlyProps = {
 
 export function PublicOnly({ children }: PublicOnlyProps) {
   const router = useRouter();
-  const { isLoading, user } = useAuth();
+  const { configError, isLoading, user } = useAuth();
 
   useEffect(() => {
-    if (!isLoading && user) {
+    if (!configError && !isLoading && user) {
       router.replace("/");
     }
-  }, [isLoading, router, user]);
+  }, [configError, isLoading, router, user]);
+
+  if (configError) {
+    return (
+      <main className="page">
+        <section className="card">
+          <div className="stack">
+            <h1>Firebase Setup Required</h1>
+            <p>{configError}</p>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   if (isLoading) {
     return (

@@ -11,7 +11,7 @@ import {
   where
 } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
-import { getFirestoreDb } from "@/lib/firebase";
+import { getFirebaseConfigError, getFirestoreDb } from "@/lib/firebase";
 
 type Opportunity = {
   id: string;
@@ -63,7 +63,7 @@ const initialForm: ApplicationFormState = {
 };
 
 export function ApplicationsManager() {
-  const { user } = useAuth();
+  const { configError, user } = useAuth();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [form, setForm] = useState<ApplicationFormState>(initialForm);
@@ -74,8 +74,24 @@ export function ApplicationsManager() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    if (!user) {
+      setOpportunities([]);
+      return;
+    }
+
     const db = getFirestoreDb();
-    const unsubscribe = onSnapshot(collection(db, "opportunities"), (snapshot) => {
+
+    if (!db) {
+      setMessage(getFirebaseConfigError() ?? "Firestore is unavailable.");
+      return;
+    }
+
+    const opportunitiesQuery = query(
+      collection(db, "opportunities"),
+      where("created_by", "==", user.uid)
+    );
+
+    const unsubscribe = onSnapshot(opportunitiesQuery, (snapshot) => {
       const nextOpportunities = snapshot.docs.map((item) => {
         const data = item.data() as Omit<Opportunity, "id">;
 
@@ -89,7 +105,7 @@ export function ApplicationsManager() {
     });
 
     return unsubscribe;
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -98,6 +114,12 @@ export function ApplicationsManager() {
     }
 
     const db = getFirestoreDb();
+
+    if (!db) {
+      setMessage(getFirebaseConfigError() ?? "Firestore is unavailable.");
+      return;
+    }
+
     const applicationsQuery = query(
       collection(db, "applications"),
       where("user_id", "==", user.uid)
@@ -153,12 +175,17 @@ export function ApplicationsManager() {
       return;
     }
 
+    const db = getFirestoreDb();
+
+    if (!db) {
+      setMessage(getFirebaseConfigError() ?? "Firestore is unavailable.");
+      return;
+    }
+
     setIsSubmitting(true);
     setMessage("");
 
     try {
-      const db = getFirestoreDb();
-
       await addDoc(collection(db, "applications"), {
         user_id: user.uid,
         opportunity_id: form.opportunity_id,
@@ -178,13 +205,19 @@ export function ApplicationsManager() {
   }
 
   async function handleStatusChange(applicationId: string, status: ApplicationStatus) {
+    const db = getFirestoreDb();
+
+    if (!db) {
+      setMessage(getFirebaseConfigError() ?? "Firestore is unavailable.");
+      return;
+    }
+
     setSavingStatus((current) => ({
       ...current,
       [applicationId]: true
     }));
 
     try {
-      const db = getFirestoreDb();
       await updateDoc(doc(db, "applications", applicationId), { status });
     } finally {
       setSavingStatus((current) => ({
@@ -195,13 +228,19 @@ export function ApplicationsManager() {
   }
 
   async function handleNotesSave(applicationId: string) {
+    const db = getFirestoreDb();
+
+    if (!db) {
+      setMessage(getFirebaseConfigError() ?? "Firestore is unavailable.");
+      return;
+    }
+
     setSavingNotes((current) => ({
       ...current,
       [applicationId]: true
     }));
 
     try {
-      const db = getFirestoreDb();
       await updateDoc(doc(db, "applications", applicationId), {
         notes: notesDrafts[applicationId] ?? ""
       });
@@ -333,7 +372,9 @@ export function ApplicationsManager() {
             <tbody>
               {applicationsWithOpportunityName.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>No applications yet.</td>
+                  <td colSpan={5}>
+                    {configError ?? "No applications yet."}
+                  </td>
                 </tr>
               ) : (
                 applicationsWithOpportunityName.map((application) => (

@@ -9,7 +9,7 @@ import {
   setPersistence,
   signInWithEmailAndPassword
 } from "firebase/auth";
-import { getFirebaseAuth } from "@/lib/firebase";
+import { getFirebaseAuth, getFirebaseConfigError } from "@/lib/firebase";
 
 type AuthFormProps = {
   mode: "login" | "signup";
@@ -21,12 +21,14 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const configError = getFirebaseConfigError();
 
   useEffect(() => {
     async function enablePersistence() {
       const auth = getFirebaseAuth();
 
       if (!auth) {
+        setMessage(configError ?? "Firebase Auth is only available in the browser.");
         return;
       }
 
@@ -42,7 +44,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     const auth = getFirebaseAuth();
 
     if (!auth) {
-      setMessage("Firebase Auth is only available in the browser.");
+      setMessage(configError ?? "Firebase Auth is only available in the browser.");
       setIsSubmitting(false);
       return;
     }
@@ -95,7 +97,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         />
       </label>
 
-      <button type="submit" disabled={isSubmitting}>
+      <button type="submit" disabled={isSubmitting || configError !== null}>
         {isSubmitting ? "Please wait..." : mode === "signup" ? "Sign up" : "Log in"}
       </button>
 

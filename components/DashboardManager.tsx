@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
-import { getFirestoreDb } from "@/lib/firebase";
+import { getFirebaseConfigError, getFirestoreDb } from "@/lib/firebase";
 
 type ApplicationStatus =
   | "not_started"
@@ -23,7 +23,7 @@ type Application = {
 };
 
 export function DashboardManager() {
-  const { user } = useAuth();
+  const { configError, user } = useAuth();
   const [applications, setApplications] = useState<Application[]>([]);
 
   useEffect(() => {
@@ -33,6 +33,11 @@ export function DashboardManager() {
     }
 
     const db = getFirestoreDb();
+
+    if (!db) {
+      return;
+    }
+
     const applicationsQuery = query(
       collection(db, "applications"),
       where("user_id", "==", user.uid)
@@ -124,7 +129,9 @@ export function DashboardManager() {
             <tbody>
               {summary.upcomingDeadlines.length === 0 ? (
                 <tr>
-                  <td colSpan={4}>No upcoming deadlines.</td>
+                  <td colSpan={4}>
+                    {configError ?? getFirebaseConfigError() ?? "No upcoming deadlines."}
+                  </td>
                 </tr>
               ) : (
                 summary.upcomingDeadlines.map((application) => (

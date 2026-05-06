@@ -2,9 +2,10 @@
 
 import { ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { User, onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth } from "@/lib/firebase";
+import { getFirebaseAuth, getFirebaseConfigError } from "@/lib/firebase";
 
 type AuthContextValue = {
+  configError: string | null;
   isLoading: boolean;
   user: User | null;
 };
@@ -18,8 +19,12 @@ type AuthProviderProps = {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   useEffect(() => {
+    const nextConfigError = getFirebaseConfigError();
+    setConfigError(nextConfigError);
+
     const auth = getFirebaseAuth();
 
     if (!auth) {
@@ -36,7 +41,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isLoading, user }}>
+    <AuthContext.Provider value={{ configError, isLoading, user }}>
       {children}
     </AuthContext.Provider>
   );

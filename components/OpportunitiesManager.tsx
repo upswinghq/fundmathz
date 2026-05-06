@@ -5,10 +5,15 @@ import {
   addDoc,
   collection,
   onSnapshot,
-  query
+  query,
+  where
 } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
-import { getFirestoreDb } from "@/lib/firebase";
+import {
+  formatFirebaseError,
+  getFirebaseConfigError,
+  getFirestoreDb
+} from "@/lib/firebase";
 
 type Opportunity = {
   id: string;
@@ -37,31 +42,51 @@ const initialForm: OpportunityFormState = {
 };
 
 export function OpportunitiesManager() {
-  const { user } = useAuth();
+  const { configError, user } = useAuth();
   const [form, setForm] = useState<OpportunityFormState>(initialForm);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    if (!user) {
+      setOpportunities([]);
+      return;
+    }
+
     const db = getFirestoreDb();
-    const opportunitiesQuery = query(collection(db, "opportunities"));
 
-    const unsubscribe = onSnapshot(opportunitiesQuery, (snapshot) => {
-      const nextItems = snapshot.docs.map((doc) => {
-        const data = doc.data() as Omit<Opportunity, "id">;
+    if (!db) {
+      setMessage(getFirebaseConfigError() ?? "Firestore is unavailable.");
+      return;
+    }
 
-        return {
-          id: doc.id,
-          ...data
-        };
-      });
+    const opportunitiesQuery = query(
+      collection(db, "opportunities"),
+      where("created_by", "==", user.uid)
+    );
 
-      setOpportunities(nextItems);
-    });
+    const unsubscribe = onSnapshot(
+      opportunitiesQuery,
+      (snapshot) => {
+        const nextItems = snapshot.docs.map((doc) => {
+          const data = doc.data() as Omit<Opportunity, "id">;
+
+          return {
+            id: doc.id,
+            ...data
+          };
+        });
+
+        setOpportunities(nextItems);
+      },
+      (error) => {
+        setMessage(formatFirebaseError(error, "Could not load opportunities."));
+      }
+    );
 
     return unsubscribe;
-  }, []);
+  }, [user]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -71,21 +96,28 @@ export function OpportunitiesManager() {
       return;
     }
 
+    const db = getFirestoreDb();
+
+    if (!db) {
+      setMessage(getFirebaseConfigError() ?? "Firestore is unavailable.");
+      return;
+    }
+
     setIsSubmitting(true);
     setMessage("");
 
     try {
-      const db = getFirestoreDb();
-
       await addDoc(collection(db, "opportunities"), {
         ...form,
         created_by: user.uid
       });
 
       setForm(initialForm);
-      setMessage("Opportunity added.");
+      setMessage(
+        "Opportunity saved. If it disappears after reload, check your Firestore rules."
+      );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Something went wrong.");
+      setMessage(formatFirebaseError(error, "Could not save opportunity."));
     } finally {
       setIsSubmitting(false);
     }
@@ -217,7 +249,9 @@ export function OpportunitiesManager() {
             <tbody>
               {opportunities.length === 0 ? (
                 <tr>
-                  <td colSpan={9}>No opportunities yet.</td>
+                  <td colSpan={9}>
+                    {configError ?? "No opportunities yet."}
+                  </td>
                 </tr>
               ) : (
                 opportunities.map((opportunity) => (

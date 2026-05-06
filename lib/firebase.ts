@@ -11,25 +11,55 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? ""
 };
 
-function getValidatedFirebaseConfig() {
+export function getFirebaseConfigError() {
   const missingKeys = Object.entries(firebaseConfig)
     .filter(([, value]) => value.length === 0)
     .map(([key]) => key);
 
-  if (missingKeys.length > 0) {
-    throw new Error(
-      `Missing Firebase environment variables: ${missingKeys.join(", ")}.`
-    );
+  if (missingKeys.length === 0) {
+    return null;
   }
 
-  return firebaseConfig;
+  return `Missing Firebase environment variables: ${missingKeys.join(", ")}.`;
+}
+
+type FirebaseLikeError = {
+  code?: string;
+  message?: string;
+};
+
+export function formatFirebaseError(
+  error: unknown,
+  fallbackMessage = "Something went wrong."
+) {
+  const firebaseError = error as FirebaseLikeError;
+
+  if (firebaseError?.code === "permission-denied") {
+    return "Firestore rejected this action. Check your Firestore security rules.";
+  }
+
+  if (firebaseError?.code === "unavailable") {
+    return "Firestore is temporarily unavailable. Please try again.";
+  }
+
+  if (firebaseError?.message) {
+    return firebaseError.message;
+  }
+
+  return fallbackMessage;
 }
 
 let app: FirebaseApp | null = null;
 
 export function getFirebaseApp() {
+  const configError = getFirebaseConfigError();
+
+  if (configError) {
+    return null;
+  }
+
   if (!app) {
-    app = getApps().length ? getApp() : initializeApp(getValidatedFirebaseConfig());
+    app = getApps().length ? getApp() : initializeApp(firebaseConfig);
   }
 
   return app;
@@ -40,9 +70,21 @@ export function getFirebaseAuth() {
     return null;
   }
 
-  return getAuth(getFirebaseApp());
+  const firebaseApp = getFirebaseApp();
+
+  if (!firebaseApp) {
+    return null;
+  }
+
+  return getAuth(firebaseApp);
 }
 
 export function getFirestoreDb() {
-  return getFirestore(getFirebaseApp());
+  const firebaseApp = getFirebaseApp();
+
+  if (!firebaseApp) {
+    return null;
+  }
+
+  return getFirestore(firebaseApp);
 }
