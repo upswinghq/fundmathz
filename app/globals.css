@@ -187,6 +187,23 @@ button:disabled {
   gap: 24px;
 }
 
+.auth-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.auth-switch-button {
+  background: #dbe6ff;
+  color: #173072;
+}
+
+.auth-switch-button-active {
+  background: #2d67f6;
+  color: #ffffff;
+}
+
 .inline-actions,
 .table-actions {
   display: flex;

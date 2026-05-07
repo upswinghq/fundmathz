@@ -21,7 +21,7 @@ export function AppSidebar() {
     const auth = getFirebaseAuth();
 
     if (!auth) {
-      router.replace("/login");
+      router.replace("/auth");
       return;
     }
 
@@ -29,7 +29,7 @@ export function AppSidebar() {
 
     try {
       await signOut(auth);
-      router.replace("/login");
+      router.replace("/auth");
     } finally {
       setIsLoggingOut(false);
     }

@@ -1,22 +1,19 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 
-type AuthGateProps = {
-  children: ReactNode;
-};
-
-export function AuthGate({ children }: AuthGateProps) {
+export function RootRouteRedirect() {
   const router = useRouter();
   const { configError, isLoading, user } = useAuth();
 
   useEffect(() => {
-    if (!configError && !isLoading && !user) {
-      router.replace("/auth");
+    if (configError || isLoading) {
+      return;
     }
+
+    router.replace(user ? "/dashboard" : "/auth");
   }, [configError, isLoading, router, user]);
 
   if (configError) {
@@ -32,15 +29,11 @@ export function AuthGate({ children }: AuthGateProps) {
     );
   }
 
-  if (isLoading || !user) {
-    return (
-      <main className="page">
-        <section className="card">
-          <p className="message">Loading...</p>
-        </section>
-      </main>
-    );
-  }
-
-  return <>{children}</>;
+  return (
+    <main className="page">
+      <section className="card">
+        <p className="message">Loading...</p>
+      </section>
+    </main>
+  );
 }

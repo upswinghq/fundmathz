@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import {
@@ -102,17 +101,6 @@ export function AuthForm({ mode }: AuthFormProps) {
       </button>
 
       <p className="message">{message}</p>
-      <p className="message">
-        {mode === "signup" ? (
-          <>
-            Already have an account? <Link href="/login">Log in</Link>
-          </>
-        ) : (
-          <>
-            Need an account? <Link href="/signup">Sign up</Link>
-          </>
-        )}
-      </p>
     </form>
   );
 }
